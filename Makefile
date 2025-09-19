@@ -32,7 +32,7 @@ all: $(TARGET).hex
 
 # flash hex file
 flash: all
-	$(AVRDUDE) -c $(PROGRAMMER) -p $(AVRDUDE_MCU) -U flash:w:$(TARGET).hex
+	$(AVRDUDE) -c $(PROGRAMMER) -p $(AVRDUDE_MCU) -U flash:w:$(TARGET).hex:i
 
 # clean
 clean: 
