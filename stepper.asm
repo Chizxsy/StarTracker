@@ -23,9 +23,12 @@ main:
     ldi r16, HIGH(RAMEND)
     out SPH, r16
 
-    ;setup GPIO pins
-    sbi DDRD, 5 ; PD5: Port D Pin 5
-    sbi DDRD, 1 ; PD1: Port D Pin 1
+    ;setup data diretion register for port A pins
+    sbi DDRA, 0 ; PA0_AD0 - x step
+    sbi DDRA, 1 ; PA1_AD1 - x dir
+
+    ;set stepper direction
+    cbi PORTA, 1 
 
     ;setup timer1 16 bit 
     ldi r16, 0x00
@@ -34,7 +37,7 @@ main:
     ;configure prescaler mux
     ;clk, clk/8, clk/64, clk/256, clk/1024, falling edge, rising, edge
     ;WGM sets CTC mode 
-    ldi r16, (1<<WGM12) | (1<<CS10) | (1<<CS10)  
+    ldi r16, (1<<WGM12) | (1<<CS12) | (1<<CS10)  
     out TCCR1B, r16
 
     ;load compare value
@@ -67,7 +70,10 @@ TIMER1_COMPA_ISR:
     push r16
 
     ;drive stepper
-    in r16, PIND
+    in r16, PORTA ;read state of port A pins
+    ldi r17, (1<<PA0) ; x step bit mask
+    eor r16, r17 ;xor bit toggle
+    out PORTA, r16 ;write new state back to GPIO
 
     ;restore context
     pop r16
