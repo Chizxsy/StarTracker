@@ -1,41 +1,31 @@
-MCU = at90usb1286
-F_CPU = 16000000UL
-PROGRAMMER = tinyusb
-AVRDUDE_MCU = usb1286
-
 # target files
+MCU = at90usb1286
 TARGET = stepper
-SRC = $(TARGET).asm
+
+TOOLCHAIN_DIR := $(HOME)/toolchains/avr8-gnu-toolchain-darwin_x86_64
 
 # toolchain
-AS = avr-as
-CC = avr-gcc
-OBJCOPY = avr-objcopy
-AVRDUDE = avrdude
-
+CC = $(TOOLCHAIN_DIR)/bin/avr-gcc
+OBJCOPY = $(TOOLCHAIN_DIR)/bin/avr-objcopy
+AVR_INCLUDE_PATH = $(TOOLCHAIN_DIR)/avr/include
 # build rules
 
 all: $(TARGET).hex
 
 # assemble .asm to .o object file
-%.o: %.asm
-	$(AS) -mmcu=$(MCU) -o $@ $<
+%.o: %.S
+	$(CC) -mmcu=$(MCU) -I $(AVR_INCLUDE_PATH) -c -o $@ $<
 
 # link .o to .elf 
 %.elf: %.o
-	$(CC) -mmcu=$(MCU) -o $@ $<
+	$(CC) -mmcu=$(MCU) -nostartfiles -o $@ $<
 
 # create hex programming file
 %.hex: %.elf
 	$(OBJCOPY) -O ihex -R .eeprom $< $@
 
-
-# flash hex file
-flash: all
-	$(AVRDUDE) -c $(PROGRAMMER) -p $(AVRDUDE_MCU) -U flash:w:$(TARGET).hex:i
-
 # clean
 clean: 
 	rm -f *.o *.elf *.hex
 
-.PHONY: all flash clean
+.PHONY: all clean

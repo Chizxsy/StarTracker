@@ -5,7 +5,7 @@
 ;==============================================================================
 .include "at90usb1286.inc"
 
-.equ TIMER_COMP_VAL 15624
+.equ TIMER_COMP_VAL, 15624
 
 .org 0x0000
     rjmp main
@@ -18,37 +18,42 @@
 ;==============================================================================
 main:
     ;initialize stack pointer
-    ldi r16, LOW(RAMEND) ;load low ramend into r16
-    out SPL, r16 ;store r16 in stack pointer low
-    ldi r16, HIGH(RAMEND)
-    out SPH, r16
+    ;load low ramend into r16
+    ldi r16, lo8(RAMEND)
+    ;store r16 in stack pointer low
+    sts SPL, r16
+    ldi r16, hi8(RAMEND)
+    sts SPH, r16
 
     ;setup data diretion register for port A pins
-    sbi DDRA, 0 ; PA0_AD0 - x step
-    sbi DDRA, 1 ; PA1_AD1 - x dir
+    in r16, DDRA ; DDRA IO ADDR | PA0_AD0 - x step | PA1_AD1 - x dir
+    ori r16, 0x03 ; sets bits 0 and 1
+    out DDRA, r16
 
     ;set stepper direction
-    cbi PORTA, 1 
+    in r16, PORTA ; PORTA
+    andi r16, 0xFD
+    out PORTA, r16
 
     ;setup timer1 16 bit 
     ldi r16, 0x00
-    out TCCR1A, r16
+    sts TCCR1A, r16
 
     ;configure prescaler mux
     ;clk, clk/8, clk/64, clk/256, clk/1024, falling edge, rising, edge
     ;WGM sets CTC mode 
-    ldi r16, (1<<WGM12) | (1<<CS12) | (1<<CS10)  
-    out TCCR1B, r16
+    ldi r16, 0x0D  
+    sts TCCR1B, r16
 
     ;load compare value
-    ldi r16, LOW(TIMER_COMP_VAL)
-    out OCR1AL, r16
-    ldi r16, HIGH(TIMER_COMP_VAL)
-    out OCR1AH, r16
+    ldi r16, lo8(TIMER_COMP_VAL)
+    sts OCR1AL, r16
+    ldi r16, hi8(TIMER_COMP_VAL)
+    sts OCR1AH, r16
 
     ;enable output compare interrupt
-    ldi r16, (1<<OCIE1A)
-    out TIMSK1, r16
+    ldi r16, 0x02 ;enable OCIE1A
+    sts TIMSK1, r16
 
     ;enable global interrupts
     sei 
@@ -71,7 +76,7 @@ TIMER1_COMPA_ISR:
 
     ;drive stepper
     in r16, PORTA ;read state of port A pins
-    ldi r17, (1<<PA0) ; x step bit mask
+    ldi r17, 0x01 ; x step bit mask
     eor r16, r17 ;xor bit toggle
     out PORTA, r16 ;write new state back to GPIO
 
