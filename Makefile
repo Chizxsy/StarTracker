@@ -1,32 +1,33 @@
 # target files
 MCU = at90usb1286
 TARGET = stepper
+F_CPU = 16000000UL
 
-TOOLCHAIN_DIR := $(HOME)/toolchains/avr8-gnu-toolchain-darwin_x86_64
+# Toolchain (assumes it's in your system's PATH)
+CC = avr-gcc
+OBJCOPY = avr-objcopy
 
-# toolchain
-CC = $(TOOLCHAIN_DIR)/bin/avr-gcc
-CFLAGS = -mmcu=at90usb1286 -DF_CPU=16000000UL
-OBJCOPY = $(TOOLCHAIN_DIR)/bin/avr-objcopy
-AVR_INCLUDE_PATH = $(TOOLCHAIN_DIR)/avr/include
+# Flags
+CFLAGS = -mmcu=$(MCU) -DF_CPU=$(F_CPU) -Wall -Os
+ASFLAGS = -x assembler-with-cpp # This is the crucial flag
+
 # build rules
-
 all: $(TARGET).hex
 
-# assemble .asm to .o object file
-%.o: %.S
-	$(CC) $(CFLAGS) -mmcu=$(MCU) -I $(AVR_INCLUDE_PATH) -c -o $@ $<
+# Link .o to .elf
+$(TARGET).elf: $(TARGET).o
+	$(CC) $(CFLAGS) -o $@ $<
 
-# link .o to .elf 
-%.elf: %.o
-	$(CC) -mmcu=$(MCU) -nostartfiles -o $@ $<
+# Assemble .S to .o object file
+$(TARGET).o: $(TARGET).S
+	$(CC) $(CFLAGS) $(ASFLAGS) -c -o $@ $<
 
-# create hex programming file
+# Create hex programming file from .elf
 %.hex: %.elf
 	$(OBJCOPY) -O ihex -R .eeprom $< $@
 
-# clean
-clean: 
+# Clean build artifacts
+clean:
 	rm -f *.o *.elf *.hex
 
 .PHONY: all clean

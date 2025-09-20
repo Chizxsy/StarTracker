@@ -1,6 +1,6 @@
 ; Addresses based on datasheet I/O map (I/O addresses 0x00-0x3F)
 
-.equ RAMEND,    0x10FF
+.equ RAMEND,    0xFF
 
 .equ DDRA,      0x01
 .equ PORTA,     0x02

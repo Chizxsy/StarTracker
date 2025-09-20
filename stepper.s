@@ -1,11 +1,15 @@
 ;==============================================================================
-; stepper.asm
-; target: AT90USB1286
-; compiler: 
+; stepper.S
+; Target: AT90USB1286
+; This version uses the standard C preprocessor and modern assembly practices.
 ;==============================================================================
-.include "at90usb1286.inc"
+;#define __AVR_AT90USB1286__ 
+#include <avr/io.h>
 
-.equ TIMER_COMP_VAL, 2000
+#define TIMER_COMP_VAL 1000
+
+.global main
+.global TIMER1_COMPA_ISR
 
 .org 0x0000
     rjmp main
@@ -17,76 +21,89 @@
 ; Main Program
 ;==============================================================================
 main:
-    ;initialize stack pointer
-    ;load low ramend into r16
-    ldi r16, lo8(RAMEND)
-    ;store r16 in stack pointer low
-    sts SPL, r16
+    ; Initialize stack pointer
     ldi r16, hi8(RAMEND)
     sts SPH, r16
+    ldi r16, lo8(RAMEND)
+    sts SPL, r16
 
-    ;setup data diretion register for port A pins
-    in r16, DDRA ; DDRA IO ADDR | PA0_AD0 - x step | PA1_AD1 - x dir
-    ori r16, 0x03 ; sets bits 0 and 1
+    ; --- Configure GPIO using Read-Modify-Write ---
+
+    ; Enable stepper driver on PE7
+    in r16, DDRE
+    ori r16, (1 << DDE7)      ; Set PE7 as an output
+    out DDRE, r16
+
+    in r16, PORTE
+    andi r16, ~(1 << PE7)     ; Pull PE7 LOW
+    out PORTE, r16
+
+    ; Set PA0 (STEP) and PA1 (DIR) as outputs
+    in r16, DDRA
+    ori r16, (1 << DDA0) | (1 << DDA1)
     out DDRA, r16
 
-    ;set stepper direction
-    in r16, PORTA ; PORTA
-    andi r16, 0xFD
+    ; Set direction (pull PA1 LOW)
+    in r16, PORTA
+    andi r16, ~(1 << PA1)
     out PORTA, r16
 
-    ;setup timer1 16 bit 
+    ; --- Setup Timer1 in CTC Mode ---
     ldi r16, 0x00
     sts TCCR1A, r16
 
-    ;configure prescaler mux
-    ;clk, clk/8, clk/64, clk/256, clk/1024, falling edge, rising, edge
-    ;WGM sets CTC mode 
-    ldi r16, 0x0D  
+    ldi r16, (1 << WGM12) | (1 << CS12) | (1 << CS10)
     sts TCCR1B, r16
 
-    ;load compare value
+    ; Load compare value
     ldi r16, lo8(TIMER_COMP_VAL)
     sts OCR1AL, r16
     ldi r16, hi8(TIMER_COMP_VAL)
     sts OCR1AH, r16
 
-    ;enable output compare interrupt
-    ldi r16, 0x02 ;enable OCIE1A
+    ; Enable Timer1 Compare A Match Interrupt
+    ldi r16, (1 << OCIE1A)
     sts TIMSK1, r16
 
-    ;enable global interrupts
-    sei 
-
+    ; Enable global interrupts
+    sei
 
 ;==============================================================================
 ; Main Loop
 ;==============================================================================
 loop:
-    cbi PORTA, 0 ;clear step pin
     rjmp loop
 
 ;==============================================================================
-; Interrupt Service Routines (ISRs)
+; Interrupt Service Routine
 ;==============================================================================
 TIMER1_COMPA_ISR:
-    ;save context
+    ; Save context
     push r16
-    push r17
-    in r16, SREG
+    in r16, _SFR_IO_ADDR(SREG)
     push r16
+    push r17 ; We now need r17 as a temporary register
 
-    ;drive stepper
-    in r16, PORTA ;read state of port A pins
-    ldi r17, 0x01 ; x step bit mask
-    eor r16, r17 ;xor bit toggle
-    out PORTA,  r16 ;write it back
+    ; --- Generate Step Pulse using Read-Modify-Write ---
 
-    ;restore context
-    pop r16
-    out SREG, r16
+    ; 1. Set step pin HIGH (rising edge)
+    in r17, PORTA
+    ori r17, (1 << PA0)
+    out PORTA, r17
+
+    ; 2. Delay for 1µs (16 NOPs @ 16MHz)
+    nop; nop; nop; nop; nop; nop; nop; nop;
+    nop; nop; nop; nop; nop; nop; nop; nop;
+
+    ; 3. Set step pin LOW (falling edge)
+    in r17, PORTA
+    andi r17, ~(1 << PA0)
+    out PORTA, r17
+
+    ; Restore context
     pop r17
-    pop  r16
+    pop r16
+    out _SFR_IO_ADDR(SREG), r16
+    pop r16
 
-    reti ;return from interrupt
-
+    reti
