@@ -5,7 +5,7 @@
 ;==============================================================================
 .include "at90usb1286.inc"
 
-.equ TIMER_COMP_VAL, 15624
+.equ TIMER_COMP_VAL, 2000
 
 .org 0x0000
     rjmp main
@@ -63,6 +63,7 @@ main:
 ; Main Loop
 ;==============================================================================
 loop:
+    cbi PORTA, 0 ;clear step pin
     rjmp loop
 
 ;==============================================================================
@@ -71,6 +72,7 @@ loop:
 TIMER1_COMPA_ISR:
     ;save context
     push r16
+    push r17
     in r16, SREG
     push r16
 
@@ -78,11 +80,12 @@ TIMER1_COMPA_ISR:
     in r16, PORTA ;read state of port A pins
     ldi r17, 0x01 ; x step bit mask
     eor r16, r17 ;xor bit toggle
-    out PORTA, r16 ;write new state back to GPIO
+    out PORTA,  r16 ;write it back
 
     ;restore context
     pop r16
     out SREG, r16
+    pop r17
     pop  r16
 
     reti ;return from interrupt
